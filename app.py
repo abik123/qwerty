@@ -3,6 +3,8 @@ import yt_dlp
 import asyncio
 import nest_asyncio
 from deepgram import Deepgram
+import os
+os.environ['PATH'] += os.pathsep + '/usr/bin'
 
 nest_asyncio.apply()
 
@@ -21,16 +23,22 @@ go_button = st.button("Run Transcription ▶️")
 # 🎧 Download and process video
 def handle_media(url):
     temp_path = "/tmp/audio"
+    ffmpeg_binary = '/usr/bin/ffmpeg'
+    ffprobe_binary = '/usr/bin/ffprobe'
+
     options = {
         'format': 'bestaudio/best',
-        'ffmpeg_location': '/usr/bin',
+        'ffmpeg_location': ffmpeg_binary,
+        'postprocessor_args': [
+        '-loglevel', 'panic'
+        ],
         'outtmpl': temp_path + '.%(ext)s',
         'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
-    }
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }]
+}
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
     return temp_path + '.mp3'

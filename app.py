@@ -1,86 +1,82 @@
 import streamlit as st
 import asyncio
 import nest_asyncio
+import os
 from deepgram import Deepgram
 import yt_dlp
-import os
+from pydub import AudioSegment
 
 nest_asyncio.apply()
 
-# Setup
+# UI Settings
 st.set_page_config(page_title="🎧 Audio & Video Transcriber")
-st.title("📝 Audio/Video-to-Text Transcriber")
-st.markdown("Upload an audio file **OR** paste a YouTube/TikTok video link for automatic transcription via Deepgram AI.")
+st.title("📝 Upload OR Paste Video Link to Transcribe")
+st.markdown("Upload an audio file **or** paste a video URL (TikTok, YouTube, etc). We'll extract the audio, transcribe it using Deepgram, and show you the text.")
 
-API_KEY = st.secrets["DEEPGRAM_API_KEY"]
+# Load Deepgram API key securely
+DG_API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-# Layout
+# Inputs
 col1, col2 = st.columns(2)
 with col1:
-    uploaded_file = st.file_uploader("📁 Upload Audio File", type=["mp3", "m4a", "wav"])
+    uploaded_audio = st.file_uploader("📁 Upload Audio File:", type=["mp3", "m4a", "wav"])
 with col2:
-    video_url = st.text_input("🔗 OR Paste Video URL (TikTok/YouTube)")
+    video_link = st.text_input("🔗 OR Paste a Video URL:")
 
 go = st.button("Transcribe Now 🔍")
 
-# Function: Transcribe using Deepgram
-async def transcribe(buffer, mimetype):
-    dg = Deepgram(API_KEY)
-    source = {'buffer': buffer, 'mimetype': mimetype}
+# 🔁 Deepgram transcription logic
+async def transcribe_audio(file_data, mimetype):
+    dg = Deepgram(DG_API_KEY)
+    source = {'buffer': file_data, 'mimetype': mimetype}
     response = await dg.transcription.prerecorded(source, {
-        'punctuate': True,
-        'smart_format': True,
-        'filler_words': True
+        "punctuate": True,
+        "smart_format": True
     })
     return response["results"]["channels"][0]["alternatives"][0]["transcript"]
 
-# Function: Download + Convert video to MP3 (using your Colab/PDF logic!)
-def download_audio_from_url(video_url):
-    base_path = "/tmp/audio"
+# ⬇️ Download + convert video (PDF logic, Streamlit-safe)
+def extract_audio_from_url(url):
+    output_video = "/tmp/video.mp4"
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'ffmpeg_location': '/usr/bin',  # Stays here just in case local test uses ffmpeg
-        'outtmpl': base_path + '.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
+        'format': 'mp4',
+        'outtmpl': output_video
     }
 
+    # Download video using yt_dlp (no ffmpeg postprocessor!)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
+        ydl.download([url])
 
-    mp3_path = base_path + '.mp3'
+    # Convert using pydub instead of ffmpeg CLI
+    audio = AudioSegment.from_file(output_video)
+    mp3_path = "/tmp/audio.mp3"
+    audio.export(mp3_path, format="mp3")
     return mp3_path
 
-# Execute after clicking "Transcribe Now"
+# 🔥 ACTUAL FLOW
 if go:
-    with st.spinner("Processing and transcribing... please wait ⏳"):
+    with st.spinner("⏳ Working..."):
 
-        # ============================ FILE UPLOAD ============================ #
-        if uploaded_file:
-            try:
-                filetype = uploaded_file.type.split('/')[-1]
-                st.audio(uploaded_file, format=f"audio/{filetype}")
-                transcript = asyncio.run(transcribe(uploaded_file, f'audio/{filetype}'))
+        try:
+            if uploaded_audio:
+                # Handle audio upload
+                filetype = uploaded_audio.type.split("/")[-1]
+                st.audio(uploaded_audio, format=uploaded_audio.type)
+                transcribed = asyncio.run(transcribe_audio(uploaded_audio, uploaded_audio.type))
                 st.success("✅ Upload transcription complete!")
-                st.text_area("📜 Transcript:", transcript, height=300)
-            except Exception as e:
-                st.error(f"⚠️ Error with uploaded file: {e}")
+                st.text_area("📜 Transcript:", transcribed, height=300)
 
-        # ============================ VIDEO LINK ============================ #
-        elif video_url:
-            try:
-                mp3_path = download_audio_from_url(video_url)
-                with open(mp3_path, 'rb') as audio_file:
-                    st.audio(audio_file, format="audio/mp3")
-                    transcript = asyncio.run(transcribe(audio_file, "audio/mp3"))
+            elif video_link:
+                # Handle video link flow
+                mp3_path = extract_audio_from_url(video_link)
+                with open(mp3_path, 'rb') as f:
+                    st.audio(f, format="audio/mp3")
+                    transcribed = asyncio.run(transcribe_audio(f, "audio/mp3"))
                     st.success("✅ Video link transcription complete!")
-                    st.text_area("📜 Transcript:", transcript, height=300)
-            except Exception as e:
-                st.error(f"⚠️ Error with video link: {e}")
+                    st.text_area("📜 Transcript:", transcribed, height=300)
 
-        else:
-            st.warning("😅 Please upload a file OR paste a video link to start.")
+            else:
+                st.warning("⚠️ Please either upload an audio file or paste a video URL.")
 
+        except Exception as e:
+            st.error(f"🚨 Something went wrong: {e}")

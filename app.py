@@ -11,7 +11,7 @@ nest_asyncio.apply()
 # Streamlit config
 st.set_page_config(page_title="🎙️ Video-to-Text")
 st.title("🎧 Video Transcript Generator")
-st.markdown("Paste a TikTok or YouTube video link to transcribe its speech ➡️ powered by Deepgram!")
+st.markdown("Paste a TikTok or YouTube video link to transcribe its speech ➡️ powered by Abik!")
 
 # Load Deepgram API key (from secrets.toml in Streamlit Cloud)
 DEEPGRAM_API_KEY = st.secrets["DEEPGRAM_API_KEY"]

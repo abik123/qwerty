@@ -1,69 +1,69 @@
 import streamlit as st
-import yt_dlp
 import asyncio
+import os
+import yt_dlp
 import nest_asyncio
 from deepgram import Deepgram
-import os
-os.environ['PATH'] += os.pathsep + '/usr/bin'
 
+# Fix event loop (just like Colab)
 nest_asyncio.apply()
 
-# 👋 Title Area
-st.set_page_config(page_title="🎤 Video Transcriber")
-st.title("🎙 Simple Video-to-Text App")
-st.info("Paste a video link (TikTok, YouTube, etc.) and get the transcript below.")
+# Streamlit config
+st.set_page_config(page_title="🎙️ Video-to-Text")
+st.title("🎧 Video Transcript Generator")
+st.markdown("Paste a TikTok or YouTube video link to transcribe its speech ➡️ powered by Deepgram!")
 
-# 🔐 API Key - pulled securely from Streamlit secrets
-API_KEY = st.secrets["DEEPGRAM_API_KEY"]
+# Load Deepgram API key (from secrets.toml in Streamlit Cloud)
+DEEPGRAM_API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-# 📥 User Input
-video_input = st.text_input("🎬 Paste video URL here:")
-go_button = st.button("Run Transcription ▶️")
+# Input field
+video_url = st.text_input("🔗 Enter Video URL here:")
 
-# 🎧 Download and process video
-def handle_media(url):
-    temp_path = "/tmp/audio"
-    ffmpeg_binary = '/usr/bin/ffmpeg'
-    ffprobe_binary = '/usr/bin/ffprobe'
+if st.button("🎬 Transcribe Now") and video_url:
 
-    options = {
-        'format': 'bestaudio/best',
-        'ffmpeg_location': ffmpeg_binary,
-        'ffprobe_location': ffprobe_binary,           
-        'postprocessor_args': [
-            '-loglevel', 'panic'
-        ],
-        'outtmpl': temp_path + '.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
-    }
-
-    with yt_dlp.YoutubeDL(options) as ydl:
-        ydl.download([url])
-    return temp_path + '.mp3'
-
-    with yt_dlp.YoutubeDL(options) as ydl:
-        ydl.download([url])
-    return temp_path + '.mp3'
-
-# 🎙 Transcribe Function
-async def run_ai(audio_path):
-    dg = Deepgram(API_KEY)
-    with open(audio_path, 'rb') as audio:
-        source = {'buffer': audio, 'mimetype': 'audio/mp3'}
-        response = await dg.transcription.prerecorded(source, {'punctuate': True})
-    return response["results"]["channels"][0]["alternatives"][0]["transcript"]
-
-# 🧠 Trigger on button click
-if go_button and video_input:
-    with st.spinner("Transcribing... Hold on ⏳"):
+    with st.spinner("⏳ Downloading audio... please wait"):
         try:
-            audio = handle_media(video_input)
-            text = asyncio.run(run_ai(audio))
-            st.success("✅ Done!")
-            st.text_area("📜 Transcript:", text, height=300)
-        except Exception as err:
-            st.error(f"Something broke 🧨: {err}")
+            # Step 1: Download audio
+            def download_audio(video_url):
+                output_path = "/tmp/audio"
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'ffmpeg_location': '/usr/bin',
+                    'outtmpl': output_path + '.%(ext)s',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192'
+                    }]
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([video_url])
+                return output_path + '.mp3'
+
+            mp3_path = download_audio(video_url)
+
+            # Step 2: Transcribe using Deepgram (async)
+            async def transcribe(mp3_path):
+                dg = Deepgram(DEEPGRAM_API_KEY)
+                with open(mp3_path, 'rb') as f:
+                    source = {
+                        'buffer': f,
+                        'mimetype': 'audio/mp3'
+                    }
+                    response = await dg.transcription.prerecorded(source, {
+                        'punctuate': True,
+                        'smart_format': True,
+                        'filler_words': True
+                    })
+
+                result = response["results"]["channels"][0]["alternatives"][0]["transcript"]
+                return result
+
+            transcript = asyncio.run(transcribe(mp3_path))
+
+            # Step 3: Show results
+            st.success("✅ Transcript ready!")
+            st.text_area("📝 Transcript Output", transcript, height=300)
+
+        except Exception as e:
+            st.error(f"Something went wrong 🤕\n{e}")

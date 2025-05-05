@@ -1,4 +1,5 @@
 streamlit
 yt-dlp
 deepgram-sdk
+pydub
 nest_asyncio

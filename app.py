@@ -29,16 +29,22 @@ def handle_media(url):
     options = {
         'format': 'bestaudio/best',
         'ffmpeg_location': ffmpeg_binary,
+        'ffprobe_location': ffprobe_binary,           
         'postprocessor_args': [
-        '-loglevel', 'panic'
+            '-loglevel', 'panic'
         ],
         'outtmpl': temp_path + '.%(ext)s',
         'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }]
-}
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
+    }
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+        ydl.download([url])
+    return temp_path + '.mp3'
+
     with yt_dlp.YoutubeDL(options) as ydl:
         ydl.download([url])
     return temp_path + '.mp3'

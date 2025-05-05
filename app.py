@@ -14,6 +14,12 @@ API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 uploaded_file = st.file_uploader("📁 Upload Audio File:", type=["mp3", "wav", "m4a"])
 go = st.button("Transcribe 🔍")
 
+# 🎧 OPTIONAL: Preview uploaded audio
+if uploaded_file:
+    st.audio(uploaded_file, format=f"audio/{uploaded_file.type.split('/')[-1]}")
+    st.caption("▶️ Click play to preview your uploaded audio.")
+
+# 🧠 Transcribe logic
 async def transcribe(buffer, mimetype):
     dg = Deepgram(API_KEY)
     source = {'buffer': buffer, 'mimetype': mimetype}
@@ -23,12 +29,9 @@ async def transcribe(buffer, mimetype):
     })
     return response["results"]["channels"][0]["alternatives"][0]["transcript"]
 
+# 🚀 On Click
 if go and uploaded_file:
     mime = f"audio/{uploaded_file.type.split('/')[-1]}"
     with st.spinner("Transcribing... ⏳"):
         try:
-            transcript = asyncio.run(transcribe(uploaded_file, mime))
-            st.success("✅ Transcription Complete!")
-            st.text_area("👂 Detected Speech", transcript, height=300)
-        except Exception as e:
-            st.error(f"🚨 Error: {e}")
+            transcript = asyncio.run(transcribe(upload

@@ -1,54 +1,34 @@
 import streamlit as st
 import asyncio
-import os
-import yt_dlp
 import nest_asyncio
 from deepgram import Deepgram
-from pydub import AudioSegment
 
 nest_asyncio.apply()
-st.set_page_config(page_title="🔈 Video to Transcript")
-st.title("🎙️ Video-to-Text Transcriber")
-st.markdown("Paste a video link – we'll extract the audio, transcribe it using Deepgram, and display it right here!")
+
+st.set_page_config(page_title="Audio-to-Text 🎧")
+st.title("📝 Upload & Transcribe Audio")
+st.markdown("Upload an `.mp3`, `.wav`, or `.m4a` file to auto-transcribe speech using Deepgram.")
 
 API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-video_url = st.text_input("🔗 Paste Video URL:")
-go = st.button("Transcribe ▶️")
+uploaded_file = st.file_uploader("📁 Upload Audio File:", type=["mp3", "wav", "m4a"])
+go = st.button("Transcribe 🔍")
 
-def download_video(url):
-    output_path = "/tmp/video"
-    ydl_opts = {
-        'format': 'mp4',
-        'outtmpl': output_path + '.%(ext)s',
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.download([url])
-    return output_path + '.mp4'
-
-def convert_to_mp3(mp4_path):
-    mp3_path = "/tmp/converted.mp3"
-    video_audio = AudioSegment.from_file(mp4_path)
-    video_audio.export(mp3_path, format="mp3")
-    return mp3_path
-
-async def transcribe(mp3_path):
+async def transcribe(buffer, mimetype):
     dg = Deepgram(API_KEY)
-    with open(mp3_path, 'rb') as f:
-        source = {'buffer': f, 'mimetype': 'audio/mp3'}
-        res = await dg.transcription.prerecorded(source, {
-            'punctuate': True,
-            'smart_format': True,
-        })
-    return res["results"]["channels"][0]["alternatives"][0]["transcript"]
+    source = {'buffer': buffer, 'mimetype': mimetype}
+    response = await dg.transcription.prerecorded(source, {
+        'punctuate': True,
+        'smart_format': True,
+    })
+    return response["results"]["channels"][0]["alternatives"][0]["transcript"]
 
-if go and video_url:
-    with st.spinner("Processing... ⏳"):
+if go and uploaded_file:
+    mime = f"audio/{uploaded_file.type.split('/')[-1]}"
+    with st.spinner("Transcribing... ⏳"):
         try:
-            mp4 = download_video(video_url)
-            mp3 = convert_to_mp3(mp4)
-            transcript = asyncio.run(transcribe(mp3))
-            st.success("✅ Transcript Complete!")
-            st.text_area("📄 Transcript:", transcript, height=300)
+            transcript = asyncio.run(transcribe(uploaded_file, mime))
+            st.success("✅ Transcription Complete!")
+            st.text_area("👂 Detected Speech", transcript, height=300)
         except Exception as e:
-            st.error(f"Something went boom 💥: `{str(e)}`")
+            st.error(f"🚨 Error: {e}")

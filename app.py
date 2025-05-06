@@ -7,7 +7,7 @@ nest_asyncio.apply()
 
 st.set_page_config(page_title="Audio-to-Text 🎧")
 st.title("📝 Upload & Transcribe Audio")
-st.markdown("Upload an `.mp3`, `.wav`, or `.m4a` file below. We'll transcribe the speech using Deepgram AI.")
+st.markdown("Upload an `.mp3`, `.wav`, or `.m4a` file below. We'll transcribe the speech using Abik Labs AI.")
 
 API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
